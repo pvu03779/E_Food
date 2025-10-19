@@ -9,12 +9,17 @@ import SwiftUI
 
 @main
 struct E_FoodApp: App {
-    let persistenceController = PersistenceController.shared
-
+    @StateObject private var locationManager = LocationManager()
+    
+    init() {
+        // Request notification permissions on app launch
+        NotificationManager.shared.requestAuthorization()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environmentObject(locationManager)
         }
     }
 }
