@@ -13,7 +13,7 @@ enum ApiError: Error {
 
 class ApiService {
     private let apiKey = "api_key"
-    private let baseURL = "https://api.spoonacularr.com"
+    private let baseURL = "https://api.spoonacular.com"
     
     private let jsonDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
