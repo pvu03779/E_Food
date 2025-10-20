@@ -2,8 +2,6 @@
 //  RecipeCard.swift
 //  E-Food
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import SwiftUICore
 import SwiftUI
@@ -42,7 +40,7 @@ struct RecipeCardView: View {
             HStack {
                 Image(systemName: "star.fill")
                     .foregroundColor(.yellow)
-                Text(String(format: "%.1f", (Double(recipe.healthScore ?? 80) / 20.0))) // Example rating
+                Text(String(format: "%.1f", (Double(recipe.healthScore ?? 80) / 20.0)))
                     .foregroundColor(.white)
                     .fontWeight(.semibold)
             }

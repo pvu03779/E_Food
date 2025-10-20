@@ -2,14 +2,12 @@
 //  NotificationManager.swift
 //  E-Food
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import Foundation
 import UserNotifications
 
 class NotificationManager {
-    static let shared = NotificationManager() // Singleton instance
+    static let shared = NotificationManager()
     
     private init() {}
 

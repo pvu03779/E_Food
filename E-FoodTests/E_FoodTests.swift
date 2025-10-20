@@ -2,8 +2,6 @@
 //  E_FoodTests.swift
 //  E-FoodTests
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import Testing
 @testable import E_Food

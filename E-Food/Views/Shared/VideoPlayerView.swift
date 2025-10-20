@@ -2,13 +2,11 @@
 //  VideoPlayerView.swift
 //  E-Food
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import SwiftUI
 
 struct VideoPlayerView: View {
-    let youTubeId: String // Updated to accept a YouTube ID
+    let youTubeId: String
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

@@ -2,8 +2,6 @@
 //  NearbyMarketsView.swift
 //  E-Food
 //
-//  Created by Vu Phong on 18/10/25.
-//
 
 import SwiftUI
 import MapKit
@@ -70,7 +68,6 @@ struct NearbyMarketsView: View {
                             }
                     }
                     .listStyle(PlainListStyle())
-                    // --- FIX 1: Inject the viewModel into the List's environment ---
                     .environmentObject(viewModel)
                 }
             }

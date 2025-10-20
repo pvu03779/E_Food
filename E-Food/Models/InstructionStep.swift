@@ -2,8 +2,6 @@
 //  InstructionStep.swift
 //  E-Food
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 struct InstructionStep: Identifiable, Decodable {
     let number: Int

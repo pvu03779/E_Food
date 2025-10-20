@@ -2,8 +2,6 @@
 //  DiscoveryView.swift
 //  E-Food
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import SwiftUI
 
@@ -111,7 +109,7 @@ struct DiscoveryView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 20) {
                         ForEach(viewModel.trendingRecipes) { recipe in
-                            NavigationLink(destination: RecipeDetailView(recipeId: recipe.id)) { // Pass recipeId
+                            NavigationLink(destination: RecipeDetailView(recipeId: recipe.id)) {
                                 RecipeCardView(recipe: recipe)
                             }.buttonStyle(PlainButtonStyle())
                         }

@@ -2,12 +2,8 @@
 //  CuisineRecipesView.swift
 //  E-Food
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import SwiftUICore
-import SwiftUI
-
 import SwiftUI
 
 struct CuisineRecipesView: View {
@@ -22,7 +18,7 @@ struct CuisineRecipesView: View {
                 Text(errorMessage).foregroundColor(.red).padding()
             } else {
                 List(viewModel.cuisineRecipes) { recipe in
-                    NavigationLink(destination: RecipeDetailView(recipeId: recipe.id)) { // Pass recipeId
+                    NavigationLink(destination: RecipeDetailView(recipeId: recipe.id)) {
                         RecipeRowView(recipe: recipe)
                     }
                 }

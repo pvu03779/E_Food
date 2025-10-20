@@ -2,8 +2,6 @@
 //  LocationManager.swift
 //  E-Food
 //
-//  Created by Vu Phong on 18/10/25.
-//
 
 import Foundation
 import CoreLocation
@@ -51,7 +49,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             DispatchQueue.main.async {
                 self.location = location
                 
-                // --- KEY CHANGE ---
                 // We have the location, stop updating to save battery
                 manager.stopUpdatingLocation()
             }

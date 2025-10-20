@@ -2,8 +2,6 @@
 //  CookingModeView.swift
 //  E-Food
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import SwiftUI
 
@@ -11,11 +9,9 @@ struct CookingModeView: View {
     @StateObject var viewModel: CookingModeViewModel
     
     var body: some View {
-        // --- SCROLLABLE LAYOUT ---
         // The entire view is now wrapped in a ScrollView.
         ScrollView {
             VStack(spacing: 20) {
-                // --- CIRCULAR PROGRESS BAR ---
                 ZStack {
                     // Background track
                     Circle()

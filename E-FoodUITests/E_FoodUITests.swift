@@ -2,8 +2,6 @@
 //  E_FoodUITests.swift
 //  E-FoodUITests
 //
-//  Created by Vu Phong on 17/10/25.
-//
 
 import XCTest
 

@@ -23,8 +23,6 @@ class CookingModeViewModel: ObservableObject {
         let initialDuration = Self.parseTime(from: steps.first?.step ?? "")
         // Use a default of 1 second if no time is found to prevent division by zero
         let safeInitialDuration = initialDuration > 0 ? initialDuration : 1
-        
-        // --- FIX: Initialize all stored properties before accessing self ---
         // Both properties are now initialized from the local constant.
         self.currentStepDuration = safeInitialDuration
         self.timeRemaining = safeInitialDuration
@@ -58,7 +56,6 @@ class CookingModeViewModel: ObservableObject {
         
         if currentStepIndex < steps.count - 1 {
             currentStepIndex += 1
-            // --- FIX: Update the duration for the new step ---
             let nextStepDuration = Self.parseTime(from: steps[currentStepIndex].step)
             self.currentStepDuration = nextStepDuration > 0 ? nextStepDuration : 1
             self.timeRemaining = self.currentStepDuration

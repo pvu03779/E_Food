@@ -1,8 +1,6 @@
 //
-//  Untitled.swift
+//  SearchViewModel.swift
 //  E-Food
-//
-//  Created by Vu Phong on 18/10/25.
 //
 import CoreLocation
 import Combine
@@ -33,8 +31,7 @@ class SearchViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
-
-    // --- KEY CHANGE: Updated logic ---
+    
     func setLocationManager(_ manager: LocationManager) {
         guard self.locationManager == nil else { return }
         self.locationManager = manager
