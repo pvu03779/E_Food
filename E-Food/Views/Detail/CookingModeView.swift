@@ -9,130 +9,138 @@ struct CookingModeView: View {
     @StateObject var viewModel: CookingModeViewModel
     
     var body: some View {
-        // The entire view is now wrapped in a ScrollView.
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 25) {
+                
+                // Timer Circle
                 ZStack {
-                    // Background track
+                    // gray circle background
                     Circle()
-                        .stroke(lineWidth: 15)
-                        .opacity(0.1)
-                        .foregroundColor(.gray)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 15)
                     
-                    // Progress bar that counts down (from full to empty)
+                    // progress bar
                     Circle()
-                        .trim(from: 0.0, to: CGFloat(viewModel.timeRemaining / viewModel.currentStepDuration))
-                        .stroke(style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round))
-                        .foregroundColor(viewModel.timeRemaining <= 10 ? .red : .orange) // Change color when time is low
-                        .rotationEffect(Angle(degrees: 270.0))
-                        .animation(.linear, value: viewModel.timeRemaining)
+                        .trim(from: 0, to: CGFloat(viewModel.timeLeft / viewModel.currentDuration))
+                        .stroke(viewModel.timeLeft < 10 ? Color.red : Color.orange, style: StrokeStyle(lineWidth: 15, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear, value: viewModel.timeLeft)
                     
-                    // Timer text and step counter
                     VStack {
-                        Text(timeString(from: viewModel.timeRemaining))
-                            .font(.largeTitle)
+                        Text(formatTime(viewModel.timeLeft))
+                            .font(.system(size: 40))
                             .bold()
                         
-                        if viewModel.currentStepIndex < viewModel.steps.count {
-                             Text("Step \(viewModel.currentStepIndex + 1) of \(viewModel.steps.count)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        Text("Step \(viewModel.currentStepIndex + 1)/\(viewModel.steps.count)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
                     }
                 }
                 .frame(width: 250, height: 250)
                 .padding(.top, 20)
                 
-                // --- STEP INSTRUCTIONS ---
-                if let currentStep = viewModel.steps.get(at: viewModel.currentStepIndex) {
-                    Text("Step \(currentStep.number)")
-                        .font(.title).bold()
-                        .padding(.top)
-                    Text(currentStep.step)
-                        .font(.body)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                // Step Instructions
+                if viewModel.currentStepIndex < viewModel.steps.count {
+                    let step = viewModel.steps[viewModel.currentStepIndex]
+                    VStack(spacing: 8) {
+                        Text("Step \(step.number)")
+                            .font(.title2)
+                            .bold()
+                        Text(step.step)
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                    }
+                    .padding(.top, 10)
                 } else {
-                    Text("You're all done! Enjoy your meal. 🎉")
-                        .font(.title).bold().padding()
+                    Text("All done! 🎉")
+                        .font(.title2)
+                        .padding()
                 }
                 
-                // --- TIMER CONTROLS ---
-                HStack(spacing: 40) {
+                // Controls
+                HStack(spacing: 50) {
                     Button(action: {
-                        viewModel.isTimerRunning ? viewModel.pauseTimer() : viewModel.startTimer()
+                        if viewModel.isRunning {
+                            viewModel.pauseTimer()
+                        } else {
+                            viewModel.startTimer()
+                        }
                     }) {
-                        Image(systemName: viewModel.isTimerRunning ? "pause.fill" : "play.fill")
-                            .font(.largeTitle).foregroundColor(.white).padding(30)
-                            .background(Color.orange).clipShape(Circle())
+                        Image(systemName: viewModel.isRunning ? "pause.fill" : "play.fill")
+                            .font(.largeTitle)
+                            .padding(25)
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .clipShape(Circle())
                     }
-                    .disabled(viewModel.timeRemaining == 0 && viewModel.isTimerRunning == false)
+                    .disabled(viewModel.timeLeft == 0)
                     
-                    Button(action: viewModel.nextStep) {
+                    Button(action: {
+                        viewModel.nextStep()
+                    }) {
                         Image(systemName: "arrow.right")
-                            .font(.largeTitle).foregroundColor(.white).padding(30)
-                            .background(Color.gray).clipShape(Circle())
+                            .font(.largeTitle)
+                            .padding(25)
+                            .background(Color.gray)
+                            .foregroundColor(.white)
+                            .clipShape(Circle())
                     }
                     .disabled(viewModel.currentStepIndex >= viewModel.steps.count)
                 }
-                .padding()
+                .padding(.top)
                 
-                // --- COMPLETED STEPS SECTION ---
-                // This is a collapsible section to show completed steps.
-                DisclosureGroup {
-                    if viewModel.completedSteps.isEmpty {
-                        Text("No steps completed yet.")
-                            .foregroundColor(.secondary)
-                            .padding()
-                    } else {
-                        VStack(alignment: .leading) {
-                            ForEach(viewModel.completedSteps) { step in
-                                HStack(alignment: .top) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                    VStack(alignment: .leading) {
-                                        Text("Step \(step.number)").fontWeight(.bold)
-                                        Text(step.step).foregroundColor(.secondary)
+                // Completed steps
+                VStack(alignment: .leading) {
+                    DisclosureGroup("Completed Steps (\(viewModel.doneSteps.count))") {
+                        if viewModel.doneSteps.isEmpty {
+                            Text("No steps completed yet 😅")
+                                .foregroundColor(.secondary)
+                                .padding(.top, 5)
+                        } else {
+                            ForEach(viewModel.doneSteps) { step in
+                                VStack(alignment: .leading) {
+                                    HStack(alignment: .top) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                        VStack(alignment: .leading) {
+                                            Text("Step \(step.number)")
+                                                .bold()
+                                            Text(step.step)
+                                                .font(.footnote)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
+                                    Divider()
                                 }
-                                .padding(.vertical, 4)
-                                Divider()
+                                .padding(.vertical, 3)
                             }
                         }
-                        .padding(.top)
                     }
-                } label: {
-                    HStack {
-                        Text("Completed Steps")
-                            .font(.headline)
-                        Spacer()
-                        Text("\(viewModel.completedSteps.count)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
                 .padding(.horizontal)
-
+                .padding(.bottom, 40)
             }
         }
+        .navigationTitle("Cooking Mode")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            // Start timer when the view appears
             if !viewModel.steps.isEmpty {
                 viewModel.startTimer()
             }
         }
         .onDisappear {
+            // Stop timer when leaving
             viewModel.pauseTimer()
         }
-        .navigationTitle("Cooking Mode")
-        .navigationBarTitleDisplayMode(.inline)
     }
     
-    private func timeString(from timeInterval: TimeInterval) -> String {
-        let minutes = Int(timeInterval) / 60
-        let seconds = Int(timeInterval) % 60
-        return String(format: "%02i:%02i", minutes, seconds)
+    private func formatTime(_ time: TimeInterval) -> String {
+        let min = Int(time) / 60
+        let sec = Int(time) % 60
+        return String(format: "%02d:%02d", min, sec)
     }
 }

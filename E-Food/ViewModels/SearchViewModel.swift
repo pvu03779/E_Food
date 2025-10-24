@@ -2,73 +2,90 @@
 //  SearchViewModel.swift
 //  E-Food
 //
+
 import CoreLocation
 import Combine
 
-@MainActor
 class SearchViewModel: ObservableObject {
     @Published var recipeResults: [Recipe] = []
-    @Published var locationString = "Checking location..."
+    @Published var locationText = "Getting your location..."
     @Published var isLoading = false
     @Published var searchText = ""
     
-    private let apiService = ApiService()
-    private let geocoder = CLGeocoder()
+    private var api = ApiService()
+    private var geocoder = CLGeocoder()
     private var locationManager: LocationManager?
     private var cancellables = Set<AnyCancellable>()
     
     init() {
-        // Debounce search text
+        // Listen to search text changes
         $searchText
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .removeDuplicates()
-            .sink { [weak self] query in
-                if !query.isEmpty {
-                    self?.searchRecipes(query: query)
+            .debounce(for: .milliseconds(600), scheduler: DispatchQueue.main)
+            .sink { [weak self] text in
+                guard let self = self else { return }
+                if text.isEmpty {
+                    self.recipeResults = []
                 } else {
-                    self?.recipeResults = []
+                    self.searchForRecipes(with: text)
                 }
             }
             .store(in: &cancellables)
     }
     
     func setLocationManager(_ manager: LocationManager) {
-        guard self.locationManager == nil else { return }
-        self.locationManager = manager
+        if locationManager != nil {
+            return
+        }
         
-        // 1. Check immediately if location already exists
-        if let location = manager.location {
-            self.geocodeLocation(location)
+        locationManager = manager
+        
+        if let loc = manager.currentLocation {
+            convertLocationToText(loc)
         } else {
-            // 2. If not, subscribe to the *first* non-nil update
-            manager.$location
+            // wait for the first location update
+            manager.$currentLocation
                 .compactMap { $0 }
                 .first()
-                .sink { [weak self] location in
-                    self?.geocodeLocation(location)
+                .sink { [weak self] loc in
+                    self?.convertLocationToText(loc)
                 }
                 .store(in: &cancellables)
         }
     }
     
-    private func geocodeLocation(_ location: CLLocation) {
+    private func convertLocationToText(_ location: CLLocation) {
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
-            if let placemark = placemarks?.first {
-                self?.locationString = "\(placemark.locality ?? "Unknown City"), \(placemark.country ?? "Unknown Country")"
+            guard let self = self else { return }
+            
+            if let err = error {
+                print("Geocode error: \(err.localizedDescription)")
+                self.locationText = "Couldn’t find location"
+                return
+            }
+            
+            if let place = placemarks?.first {
+                let city = place.locality ?? "Unknown"
+                let country = place.country ?? ""
+                self.locationText = "\(city), \(country)"
             } else {
-                self?.locationString = "Location not found"
+                self.locationText = "No location info"
             }
         }
     }
     
-    func searchRecipes(query: String) {
+    func searchForRecipes(with name: String) {
         Task {
             isLoading = true
+            
             do {
-                recipeResults = try await apiService.fetchRecipes(query: query)
+                let results = try await api.searchRecipes(name: name)
+                DispatchQueue.main.async {
+                    self.recipeResults = results
+                }
             } catch {
-                print("Error searching recipes: \(error.localizedDescription)")
+                print("Search failed: \(error)")
             }
+            
             isLoading = false
         }
     }

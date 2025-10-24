@@ -1,59 +1,66 @@
+//
+//  FavoritesView.swift
+//  E-Food
+//
+
 import SwiftUI
- 
- struct FavoritesView: View {
-     @StateObject private var viewModel = FavoritesViewModel()
- 
-     var body: some View {
-         NavigationView {
-             Group {
-                 if viewModel.isLoading {
-                     ProgressView("Loading Favorites...")
-                 } else if let errorMessage = viewModel.errorMessage {
-                     Text(errorMessage).foregroundColor(.red).padding()
-                 } else if viewModel.favoriteRecipes.isEmpty {
-                     Text("You haven't saved any favorite recipes yet.")
-                         .font(.headline)
-                         .foregroundColor(.secondary)
-                 } else {
-                     List(viewModel.favoriteRecipes) { recipe in
-                         NavigationLink(destination: RecipeDetailView(recipeId: Int(recipe.recipeId))) {
-                             FavoriteRowView(recipe: recipe)
-                         }
-                     }
-                 }
-             }
-             .navigationTitle("Favorites")
-             .onAppear {
-                 // This will run when the view first appears
-                 viewModel.fetchFavorites()
-             }
-         }
-     }
- }
- 
- /// A simple row view for the favorites list.
- struct FavoriteRowView: View {
-     let recipe: FavoriteRecipe // Updated to use the Core Data entity
- 
-     var body: some View {
-         HStack(spacing: 16) {
-             AsyncImage(url: URL(string: recipe.imageURL ?? "")) { image in
-                 image.resizable()
-             } placeholder: {
-                 Rectangle().fill(Color.gray.opacity(0.3))
-             }
-             .frame(width: 80, height: 80)
-             .cornerRadius(10)
- 
-             VStack(alignment: .leading) {
-                 Text(recipe.title ?? "Unknown Recipe")
-                     .font(.headline)
-                     .lineLimit(2)
-                 Text("\(recipe.readyInMinutes) Min")
-                     .font(.subheadline)
-                     .foregroundColor(.gray)
-             }
-         }
-         .padding(.vertical, 8)
-     }
- }
+
+struct FavoritesView: View {
+    @StateObject var vm = FavoritesViewModel()
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                if vm.loading {
+                    ProgressView("Loading... please wait")
+                } else if let err = vm.errorText {
+                    Text(err)
+                        .foregroundColor(.red)
+                        .padding()
+                } else if vm.favs.isEmpty {
+                    Text("No favorite recipes yet")
+                        .foregroundColor(.gray)
+                        .padding()
+                } else {
+                    List {
+                        ForEach(vm.favs) { fav in
+                            NavigationLink(destination: RecipeDetailView(recipeId: Int(fav.recipeId))) {
+                                FavRow(recipe: fav)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Favorites")
+            .onAppear {
+                print("View appeared, loading favorites...")
+                vm.loadFavs()
+            }
+        }
+    }
+}
+
+struct FavRow: View {
+    let recipe: FavoriteRecipe
+    
+    var body: some View {
+        HStack {
+            AsyncImage(url: URL(string: recipe.imageURL ?? "")) { img in
+                img.resizable()
+            } placeholder: {
+                Color.gray.opacity(0.2)
+            }
+            .frame(width: 70, height: 70)
+            .cornerRadius(8)
+            
+            VStack(alignment: .leading) {
+                Text(recipe.title ?? "Untitled")
+                    .font(.headline)
+                Text("\(recipe.readyInMinutes) mins")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(5)
+    }
+}

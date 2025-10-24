@@ -8,54 +8,64 @@ import CoreLocation
 import Combine
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    private let locationManager = CLLocationManager()
     
-    @Published var location: CLLocation?
-    @Published var authorizationStatus: CLAuthorizationStatus
+    var locationManager = CLLocationManager()
+    
+    @Published var currentLocation: CLLocation?
+    @Published var status: CLAuthorizationStatus = .notDetermined
     
     override init() {
-        self.authorizationStatus = locationManager.authorizationStatus
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        requestPermission()
+        
+        // ask user for location stuff
+        askForPermission()
     }
     
-    func requestPermission() {
-        if authorizationStatus == .notDetermined {
-            // This will now trigger on app launch
+    func askForPermission() {
+        let auth = locationManager.authorizationStatus
+        
+        // if user never said yes or no yet
+        if auth == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
-        } else {
+        } else if auth == .authorizedWhenInUse || auth == .authorizedAlways {
             locationManager.startUpdatingLocation()
+        } else {
+            print("Location not allowed by user")
         }
     }
     
-    // Delegate method for authorization changes
+    // called when permission changes (I think)
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         DispatchQueue.main.async {
-            self.authorizationStatus = manager.authorizationStatus
-            if self.authorizationStatus == .authorizedWhenInUse || self.authorizationStatus == .authorizedAlways {
-                manager.startUpdatingLocation()
+            self.status = manager.authorizationStatus
+            
+            if self.status == .authorizedWhenInUse || self.status == .authorizedAlways {
+                self.locationManager.startUpdatingLocation()
             } else {
-                manager.stopUpdatingLocation()
-                self.location = nil
+                self.locationManager.stopUpdatingLocation()
+                self.currentLocation = nil
             }
         }
     }
     
-    // Delegate method for location updates
+    // gets called when location updates
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if let location = locations.first {
+        if let first = locations.first {
             DispatchQueue.main.async {
-                self.location = location
+                self.currentLocation = first
+                print("Got location: \(first.coordinate.latitude), \(first.coordinate.longitude)")
                 
-                // We have the location, stop updating to save battery
-                manager.stopUpdatingLocation()
+                // probably don’t need to keep tracking?
+                self.locationManager.stopUpdatingLocation()
             }
+        } else {
+            print("No location found")
         }
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("Location manager failed with error: \(error.localizedDescription)")
+        print("location failed: \(error.localizedDescription)")
     }
 }

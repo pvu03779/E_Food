@@ -8,113 +8,109 @@ import MapKit
 import CoreLocation
 import Combine
 
-// MARK: - Main Markets View
 struct NearbyMarketsView: View {
-    @StateObject private var viewModel = MarketsViewModel()
-    @Environment(\.dismiss) private var dismiss
-    
+    @StateObject var viewModel = MarketsViewModel()
+    @Environment(\.dismiss) var dismiss
     @EnvironmentObject var locationManager: LocationManager
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // 1. Location Status / Permission Prompt
+            VStack {
+                
+                // show message if location not allowed
                 locationStatusView
                 
-                // 2. Map View
-                Map(position: $viewModel.cameraPosition, selection: $viewModel.selectedResult) {
-                    ForEach(viewModel.searchResults) { result in
-                        Annotation(
-                            result.item.name ?? "Supermarket",
-                            coordinate: result.item.placemark.coordinate
-                        ) {
+                // map area
+                Map(position: $viewModel.mapPosition) {
+                    ForEach(viewModel.markets) { market in
+                        Annotation(market.item.name ?? "Supermarket",
+                                   coordinate: market.item.placemark.coordinate) {
                             Image(systemName: "cart.circle.fill")
                                 .font(.title)
                                 .foregroundColor(.orange)
-                                .background(.white)
+                                .background(Color.white)
                                 .clipShape(Circle())
                         }
                     }
                     
-                    if let userLocation = viewModel.locationManager?.location {
-                        Annotation("My Location", coordinate: userLocation.coordinate) {
+                    
+                    // show user location pin
+                    if let myLocation = viewModel.locationManager?.currentLocation {
+                        Annotation("Me", coordinate: myLocation.coordinate) {
                             Image(systemName: "person.circle.fill")
                                 .font(.title)
                                 .foregroundColor(.blue)
-                                .background(.white)
+                                .background(Color.white)
                                 .clipShape(Circle())
                         }
                     }
                 }
                 .frame(height: 300)
+                .padding(.bottom, 5)
                 
-                // 3. Results List
-                if viewModel.isSearching {
-                    ProgressView("Searching for nearby markets...")
+                // list area or loading
+                if viewModel.isLoading {
+                    ProgressView("Finding nearby markets...")
                         .padding()
                     Spacer()
-                } else if viewModel.searchResults.isEmpty {
-                    Text("No nearby markets found. We search for 'supermarket' and 'grocery'.")
+                } else if viewModel.markets.isEmpty {
+                    Text("No markets found nearby 😕")
                         .font(.callout)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.gray)
                         .padding()
                     Spacer()
                 } else {
-                    List(viewModel.searchResults) { result in
-                        SupermarketRowView(result: result)
+                    List(viewModel.markets) { market in
+                        MarketRowView(market: market)
                             .onTapGesture {
-                                // This selects the item on the map
-                                viewModel.selectResult(result)
+                                viewModel.selectMarket(market)
                             }
                     }
-                    .listStyle(PlainListStyle())
+                    .listStyle(.plain)
                     .environmentObject(viewModel)
                 }
             }
             .navigationTitle("Nearby Markets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
                         dismiss()
                     }
                 }
             }
             .onAppear {
-                viewModel.setLocationManager(locationManager)
+                // make sure to set up location manager
+                viewModel.setupLocationManager(locationManager)
             }
         }
     }
     
-    /// A helper view to show the user the status of their location permission.
+    // MARK: - Location Permission View
     @ViewBuilder
     private var locationStatusView: some View {
-        switch viewModel.locationManager?.authorizationStatus {
-        case .denied, .restricted:
-            VStack {
-                Text("Location Access Denied")
-                    .font(.headline)
-                Text("Enable location access in Settings to find supermarkets near you.")
-                    .font(.caption)
-                    .multilineTextAlignment(.center)
-                    .padding(.bottom, 4)
-                Button("Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
+        if let status = viewModel.locationManager?.status {
+            if status == .denied || status == .restricted {
+                VStack(spacing: 6) {
+                    Text("Location Access Denied")
+                        .font(.headline)
+                    Text("Please allow location access in Settings.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Open Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
                     }
+                    .buttonStyle(.bordered)
+                    .tint(.orange)
                 }
-                .buttonStyle(.bordered)
-                .tint(.orange)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+                .padding(.horizontal)
             }
-            .padding(12)
-            .background(Color(.systemGray6))
-            .cornerRadius(10)
-            .padding(.horizontal)
-            
-        case .notDetermined, .authorizedWhenInUse, .authorizedAlways, .none:
-            EmptyView()
-        default:
-            EmptyView()
         }
     }
 }
@@ -122,99 +118,95 @@ struct NearbyMarketsView: View {
 // MARK: - View Model
 @MainActor
 class MarketsViewModel: ObservableObject {
-    @Published var searchResults: [SupermarketResult] = []
+    @Published var markets: [MarketItem] = []
+    @Published var isLoading = false
+    @Published var mapPosition: MapCameraPosition = .automatic
+    @Published var selectedMarket: MarketItem?
     
-    @Published var isSearching = false
-    @Published var cameraPosition: MapCameraPosition = .automatic
-    @Published var selectedResult: SupermarketResult?
-    
-    private var searchTask: Task<Void, Never>?
+    var locationManager: LocationManager?
     private var cancellables = Set<AnyCancellable>()
+    private var searchTask: Task<Void, Never>?
     
-    private(set) var locationManager: LocationManager?
-    
-    init() {
-        // Init is now empty
-    }
-    
-    func setLocationManager(_ manager: LocationManager) {
-        guard self.locationManager == nil else { return }
-        self.locationManager = manager
+    func setupLocationManager(_ manager: LocationManager) {
+        if locationManager == nil {
+            locationManager = manager
+        }
         
-        if let location = manager.location {
-            self.performSearch(location: location)
+        // if we already have location, start searching
+        if let loc = manager.currentLocation {
+            searchNearby(location: loc)
         } else {
-            manager.$location
+            // wait for location to show up
+            manager.$currentLocation
                 .compactMap { $0 }
                 .first()
                 .sink { [weak self] location in
-                    self?.performSearch(location: location)
+                    self?.searchNearby(location: location)
                 }
                 .store(in: &cancellables)
         }
     }
     
-    func selectResult(_ result: SupermarketResult) {
-        self.selectedResult = result
-        self.cameraPosition = .region(MKCoordinateRegion(
-            center: result.item.placemark.coordinate,
-            latitudinalMeters: 1000,
-            longitudinalMeters: 1000
-        ))
-        fetchETA(for: result)
-    }
-    
-    func performSearch(location: CLLocation) {
+    func searchNearby(location: CLLocation) {
+        isLoading = true
         searchTask?.cancel()
+        
         searchTask = Task {
-            isSearching = true
-            defer { isSearching = false }
-            
+            defer { isLoading = false }
             let request = MKLocalSearch.Request()
-            request.naturalLanguageQuery = "mart"
-            request.region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: 5000, longitudinalMeters: 5000)
+            request.naturalLanguageQuery = "supermarket"
+            request.region = MKCoordinateRegion(
+                center: location.coordinate,
+                latitudinalMeters: 5000,
+                longitudinalMeters: 5000
+            )
             
             do {
                 let search = MKLocalSearch(request: request)
                 let response = try await search.start()
                 
-                if !Task.isCancelled {
-                    // Map the results
-                    var results = response.mapItems.compactMap { item -> SupermarketResult? in
-                        guard let itemLocation = item.placemark.location else {
-                            return nil
-                        }
-                        let distance = location.distance(from: itemLocation)
-                        return SupermarketResult(item: item, distance: distance)
+                var tempMarkets: [MarketItem] = []
+                for item in response.mapItems {
+                    if let loc = item.placemark.location {
+                        let dist = location.distance(from: loc)
+                        tempMarkets.append(MarketItem(item: item, distance: dist))
                     }
-                    results.sort { ($0.distance ?? Double.infinity) < ($1.distance ?? Double.infinity) }
-                    
-                    self.searchResults = results
-                    updateMapRegion(location: location)
                 }
+                
+                tempMarkets.sort { ($0.distance ?? 0) < ($1.distance ?? 0) }
+                self.markets = tempMarkets
+                updateMap(location: location)
             } catch {
-                if !Task.isCancelled {
-                    print("Search error: \(error.localizedDescription)")
-                    self.searchResults = []
-                }
+                print("Error while searching: \(error)")
+                self.markets = []
             }
         }
     }
     
-    private func updateMapRegion(location: CLLocation) {
-        cameraPosition = .region(MKCoordinateRegion(
+    func selectMarket(_ market: MarketItem) {
+        selectedMarket = market
+        mapPosition = .region(MKCoordinateRegion(
+            center: market.item.placemark.coordinate,
+            latitudinalMeters: 1000,
+            longitudinalMeters: 1000
+        ))
+        getETA(for: market)
+    }
+    
+    func updateMap(location: CLLocation) {
+        mapPosition = .region(MKCoordinateRegion(
             center: location.coordinate,
             latitudinalMeters: 5000,
             longitudinalMeters: 5000
         ))
     }
     
-    func fetchETA(for result: SupermarketResult) {
-        guard let userLocation = locationManager?.location else { return }
+    func getETA(for market: MarketItem) {
+        guard let userLoc = locationManager?.currentLocation else { return }
         
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: userLocation.coordinate))
-        request.destination = result.item
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: userLoc.coordinate))
+        request.destination = market.item
         request.transportType = .automobile
         
         Task {
@@ -222,72 +214,59 @@ class MarketsViewModel: ObservableObject {
                 let directions = MKDirections(request: request)
                 let response = try await directions.calculate()
                 if let route = response.routes.first {
-                    if let index = searchResults.firstIndex(where: { $0.id == result.id }) {
-                        searchResults[index].eta = route.expectedTravelTime
+                    if let index = markets.firstIndex(where: { $0.id == market.id }) {
+                        markets[index].eta = route.expectedTravelTime
                     }
                 }
             } catch {
-                print("Failed to fetch ETA: \(error)")
+                print("Failed to get ETA: \(error)")
             }
         }
     }
     
-    /// Opens the selected map item in Apple Maps for navigation.
-    func openInMaps(_ mapItem: MKMapItem) {
-        // Set launch options to show driving directions
-        // from the user's current location.
-        let launchOptions = [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-        ]
-        mapItem.openInMaps(launchOptions: launchOptions)
+    func openInMaps(_ item: MKMapItem) {
+        let options = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
+        item.openInMaps(launchOptions: options)
     }
 }
 
 // MARK: - Model
-struct SupermarketResult: Identifiable, Hashable {
+struct MarketItem: Identifiable {
     let id = UUID()
     let item: MKMapItem
     let distance: CLLocationDistance?
     var eta: TimeInterval?
     
-    static func == (lhs: SupermarketResult, rhs: SupermarketResult) -> Bool {
-        lhs.id == rhs.id
-    }
-    
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-    
-    var distanceString: String? {
+    var distanceText: String? {
         guard let distance else { return nil }
-        let formatter = LengthFormatter()
-        formatter.unitStyle = .short
-        return formatter.string(fromMeters: distance)
+        let f = LengthFormatter()
+        f.unitStyle = .short
+        return f.string(fromMeters: distance)
     }
     
-    var etaString: String? {
+    var etaText: String? {
         guard let eta else { return nil }
-        let formatter = DateComponentsFormatter()
-        formatter.unitsStyle = .short
-        formatter.allowedUnits = [.hour, .minute]
-        return formatter.string(from: eta)
+        let f = DateComponentsFormatter()
+        f.allowedUnits = [.hour, .minute]
+        f.unitsStyle = .short
+        return f.string(from: eta)
     }
 }
 
-// MARK: - Helper Views
-struct SupermarketRowView: View {
-    let result: SupermarketResult
-    @EnvironmentObject private var viewModel: MarketsViewModel
+// MARK: - Row
+struct MarketRowView: View {
+    let market: MarketItem
+    @EnvironmentObject var viewModel: MarketsViewModel
     
     var body: some View {
-        Button(action: {
-            viewModel.openInMaps(result.item)
-        }) {
+        Button {
+            viewModel.openInMaps(market.item)
+        } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(result.item.name ?? "Unknown")
+                    Text(market.item.name ?? "Unknown Market")
                         .font(.headline)
-                    Text(result.item.placemark.title ?? "No address")
+                    Text(market.item.placemark.title ?? "No address available")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -295,13 +274,12 @@ struct SupermarketRowView: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if let distance = result.distanceString {
-                        Text(distance)
+                    if let dist = market.distanceText {
+                        Text(dist)
                             .font(.subheadline)
-                            .fontWeight(.medium)
                     }
-                    if let eta = result.etaString {
-                        Text("~ \(eta) drive")
+                    if let eta = market.etaText {
+                        Text("~\(eta) drive")
                             .font(.caption)
                             .foregroundColor(.blue)
                     }

@@ -1,36 +1,46 @@
+//
+//  FavoritesViewModel.swift
+//  E-Food
+//
+
 import Foundation
 import Combine
 import CoreData
 
 @MainActor
 class FavoritesViewModel: ObservableObject {
-    @Published var favoriteRecipes: [FavoriteRecipe] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
     
-    private let persistence = PersistenceManager.shared
-    private var cancellables = Set<AnyCancellable>()
+    @Published var favs: [FavoriteRecipe] = []
+    @Published var loading = false
+    @Published var errorText: String? = nil
+    
+    let core = PersistenceManager.shared
+    var subs = Set<AnyCancellable>()
     
     init() {
-        // Listen for external changes (e.g., from the detail screen) to refresh the list
-        NotificationCenter.default.publisher(for: PersistenceManager.favoritesChangedNotification)
+        // listen for changes from other screens
+        NotificationCenter.default.publisher(for: PersistenceManager.favsChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.fetchFavorites()
+                print("Favorites changed")
+                self?.loadFavs()
             }
-            .store(in: &cancellables)
+            .store(in: &subs)
     }
     
-    func fetchFavorites() {
-        isLoading = true
-        errorMessage = nil
+    func loadFavs() {
+        loading = true
+        errorText = nil
+        print("Fetching favorite recipes")
         
         do {
-            favoriteRecipes = try persistence.fetchAllFavorites()
+            favs = try core.getAllFavs()
+            print("Got \(favs.count) favorites")
         } catch {
-            errorMessage = "Failed to fetch favorite recipes: \(error.localizedDescription)"
+            print("Error getting favorites:", error)
+            errorText = "Couldn't load favorites"
         }
         
-        isLoading = false
+        loading = false
     }
 }

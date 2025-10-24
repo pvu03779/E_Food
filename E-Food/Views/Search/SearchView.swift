@@ -6,58 +6,67 @@
 import SwiftUI
 
 struct SearchView: View {
-    @StateObject private var viewModel = SearchViewModel()
-    @State private var isShowingMapView = false
-    
+    @StateObject var viewModel = SearchViewModel()
+    @State private var showMap = false
     @EnvironmentObject var locationManager: LocationManager
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // 1. Search Bar
-                SearchBar(text: $viewModel.searchText)
+    
+    var isPushedView: Bool = false
+    
+    var searchViewContent: some View {
+            VStack {
+                SearchBarView(text: $viewModel.searchText)
+                    .padding(.top, 10)
                     .padding(.horizontal)
-                    .padding(.top)
-
-                // 2. Location Label
+                
                 HStack {
                     Image(systemName: "mappin.and.ellipse")
-                        .foregroundColor(.orange)
-                    Text(viewModel.locationString)
+                        .foregroundColor(.red)
+                    Text(viewModel.locationText)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.gray)
                     Spacer()
                 }
                 .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6))
+                .padding(.vertical, 6)
                 .onTapGesture {
-                    isShowingMapView = true
+                    showMap.toggle()
                 }
                 
-                // 3. Results List
-                if viewModel.isLoading {
-                    ProgressView("Finding recipes...")
-                        .padding()
-                    Spacer()
-                } else if viewModel.recipeResults.isEmpty && !viewModel.searchText.isEmpty {
-                    Text("No recipes found for \"\(viewModel.searchText)\"")
-                        .font(.callout)
-                        .foregroundColor(.secondary)
-                        .padding()
-                    Spacer()
+                Divider()
+                
+                // Recipe List or Loading
+                if viewModel.isLoading && viewModel.recipeResults.isEmpty {
+                    VStack {
+                        ProgressView("Searching recipes...")
+                            .padding()
+                        Spacer()
+                    }
+                } else if viewModel.recipeResults.isEmpty {
+                    if !viewModel.searchText.isEmpty {
+                        Text("No results for '\(viewModel.searchText)'")
+                            .foregroundColor(.secondary)
+                            .padding()
+                        Spacer()
+                    } else {
+                        Text("Start typing to find recipes")
+                            .foregroundColor(.secondary)
+                            .padding()
+                        Spacer()
+                    }
                 } else {
-                    List(viewModel.recipeResults) { recipe in
-                        NavigationLink(destination: RecipeDetailView(recipeId: recipe.id)) {
-                            // Use the existing RecipeRowView
-                            RecipeRowView(recipe: recipe)
+                    List {
+                        ForEach(viewModel.recipeResults) { recipe in
+                            NavigationLink(destination: RecipeDetailView(recipeId: recipe.id)) {
+                                RecipeRowView(recipe: recipe)
+                            }
                         }
                     }
-                    .listStyle(PlainListStyle())
+                    .listStyle(.plain)
                 }
             }
-            .navigationTitle("Search Recipes")
-            .sheet(isPresented: $isShowingMapView) {
+            .navigationTitle("Find Recipes")
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showMap) {
                 NearbyMarketsView()
                     .environmentObject(locationManager)
             }
@@ -65,22 +74,35 @@ struct SearchView: View {
                 viewModel.setLocationManager(locationManager)
             }
         }
-    }
+    
+    var body: some View {
+            if isPushedView {
+                searchViewContent
+            } else {
+                NavigationView {
+                    searchViewContent
+                }
+            }
+        }
+    
 }
 
-// MARK: - Helper Views
-struct SearchBar: View {
+// MARK: - Search Bar View
+struct SearchBarView: View {
     @Binding var text: String
-
+    
     var body: some View {
         HStack {
-            TextField("Search for any recipe...", text: $text)
-                .padding(10)
+            TextField("Type recipe name...", text: $text)
+                .padding(8)
                 .background(Color(.systemGray5))
                 .cornerRadius(8)
+                .padding(.trailing, 4)
             
             if !text.isEmpty {
-                Button(action: { text = "" }) {
+                Button(action: {
+                    text = ""
+                }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.gray)
                 }
@@ -88,7 +110,6 @@ struct SearchBar: View {
         }
     }
 }
-
 
 struct SearchView_Previews: PreviewProvider {
     static var previews: some View {

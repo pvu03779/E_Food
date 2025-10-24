@@ -1,104 +1,128 @@
+//
+//  CookingModeViewModel.swift
+//  E-Food
+//
+
 import Foundation
 import Combine
 
 @MainActor
 class CookingModeViewModel: ObservableObject {
-    let steps: [InstructionStep]
-    let recipeTitle: String
+    
+    var steps: [InstructionStep]
+    var title: String
     
     @Published var currentStepIndex = 0
-    @Published var completedSteps: [InstructionStep] = []
-    @Published var timeRemaining: TimeInterval
-    @Published var isTimerRunning = false
+    @Published var doneSteps: [InstructionStep] = []
+    @Published var timeLeft: TimeInterval = 0
+    @Published var isRunning = false
+    @Published var currentDuration: TimeInterval = 0
     
-    // This now tracks the duration of the CURRENT step and is @Published
-    @Published var currentStepDuration: TimeInterval
+    private var timerThing: AnyCancellable?
     
-    private var timer: AnyCancellable?
-
-    init(steps: [InstructionStep], recipeTitle: String) {
+    init(steps: [InstructionStep], title: String) {
         self.steps = steps
-        self.recipeTitle = recipeTitle
-        // Set the initial duration for the first step
-        let initialDuration = Self.parseTime(from: steps.first?.step ?? "")
-        // Use a default of 1 second if no time is found to prevent division by zero
-        let safeInitialDuration = initialDuration > 0 ? initialDuration : 1
-        // Both properties are now initialized from the local constant.
-        self.currentStepDuration = safeInitialDuration
-        self.timeRemaining = safeInitialDuration
+        self.title = title
+        
+        // try to get the time from first step
+        let t = Self.findTime(from: steps.first?.step ?? "")
+        self.currentDuration = t > 0 ? t : 1
+        self.timeLeft = self.currentDuration
     }
     
     func startTimer() {
-        guard timeRemaining > 0 else { return }
-        isTimerRunning = true
-        timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect().sink { [weak self] _ in
-            guard let self = self, self.isTimerRunning else { return }
-            if self.timeRemaining > 0 {
-                self.timeRemaining -= 1
-            } else {
-                self.timerCompleted()
-            }
+        if timeLeft <= 0 {
+            print("Timer already done.")
+            return
         }
+        
+        isRunning = true
+        timerThing = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                if self.isRunning {
+                    if self.timeLeft > 0 {
+                        self.timeLeft -= 1
+                    } else {
+                        self.stepDone()
+                    }
+                }
+            }
     }
     
     func pauseTimer() {
-        isTimerRunning = false
-        timer?.cancel()
+        isRunning = false
+        timerThing?.cancel()
+        print("Timer paused at \(timeLeft) seconds left")
     }
     
     func nextStep() {
         pauseTimer()
-        if let currentStep = steps.get(at: currentStepIndex) {
-            if !completedSteps.contains(where: { $0.id == currentStep.id }) {
-                 completedSteps.append(currentStep)
+        
+        if currentStepIndex < steps.count {
+            let current = steps[currentStepIndex]
+            if !doneSteps.contains(where: { $0.id == current.id }) {
+                doneSteps.append(current)
             }
         }
         
         if currentStepIndex < steps.count - 1 {
             currentStepIndex += 1
-            let nextStepDuration = Self.parseTime(from: steps[currentStepIndex].step)
-            self.currentStepDuration = nextStepDuration > 0 ? nextStepDuration : 1
-            self.timeRemaining = self.currentStepDuration
+            let nextDuration = Self.findTime(from: steps[currentStepIndex].step)
+            self.currentDuration = nextDuration > 0 ? nextDuration : 1
+            self.timeLeft = self.currentDuration
+            print("Moving to next step: \(currentStepIndex + 1)")
             startTimer()
         } else {
-            // Mark the final step as complete if not already
-            if let lastStep = steps.last, !completedSteps.contains(where: { $0.id == lastStep.id }) {
-                completedSteps.append(lastStep)
+            print("All steps finished!")
+            if let last = steps.last, !doneSteps.contains(where: { $0.id == last.id }) {
+                doneSteps.append(last)
             }
-            currentStepIndex += 1
         }
     }
     
-    private func timerCompleted() {
+    private func stepDone() {
         pauseTimer()
+        print("Step \(currentStepIndex + 1) done!")
         NotificationManager.shared.scheduleNotification(
-            title: recipeTitle,
-            body: "Step \(steps[currentStepIndex].number) is complete!",
+            title: title,
+            body: "Step \(steps[currentStepIndex].number) is done!",
             timeInterval: 1
         )
     }
     
-    static private func parseTime(from text: String) -> TimeInterval {
+    static func findTime(from text: String) -> TimeInterval {
+        // trying to find minutes/hours in the text
         do {
             let regex = try NSRegularExpression(pattern: #"(\d+)\s+(minute|hour)s?"#, options: .caseInsensitive)
             let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
-            
             for match in matches {
-                if let numberRange = Range(match.range(at: 1), in: text),
+                if let numRange = Range(match.range(at: 1), in: text),
                    let unitRange = Range(match.range(at: 2), in: text) {
-                    let number = Double(text[numberRange]) ?? 0
-                    let unit = String(text[unitRange]).lowercased()
-                    return unit == "hour" ? number * 3600 : number * 60
+                    let num = Double(text[numRange]) ?? 0
+                    let unit = text[unitRange].lowercased()
+                    if unit == "hour" {
+                        return num * 3600
+                    } else {
+                        return num * 60
+                    }
                 }
             }
-        } catch {}
+        } catch {
+            print("regex fail: \(error)")
+        }
         return 0
     }
 }
 
 extension Array {
-    func get(at index: Int) -> Element? {
-        return indices.contains(index) ? self[index] : nil
+    func safeGet(_ index: Int) -> Element? {
+        if indices.contains(index) {
+            return self[index]
+        } else {
+            print("Index \(index) out of range!")
+            return nil
+        }
     }
 }
-

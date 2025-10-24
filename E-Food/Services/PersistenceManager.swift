@@ -1,118 +1,125 @@
+//
+//  PersistenceManager.swift
+//  E-Food
+//
+
 import Foundation
 import CoreData
 
 class PersistenceManager {
     static let shared = PersistenceManager()
-    static let favoritesChangedNotification = Notification.Name("favoritesChanged")
+    
+    // notification name for favorites update
+    static let favsChanged = Notification.Name("favsChanged")
+    
+    // making sure it's a singleton
     private init() {}
     
-    // MARK: - Core Data Stack
-    lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "DataModel")
-        container.loadPersistentStores { description, error in
+    // MARK: - Core Data setup
+    lazy var container: NSPersistentContainer = {
+        let c = NSPersistentContainer(name: "DataModel")
+        c.loadPersistentStores { desc, error in
             if let error = error {
-                fatalError("Unable to load persistent stores: \(error)")
+                print("can't load core data: \(error)")
+            } else {
+                print("CoreData ready to go!")
             }
         }
-        return container
+        return c
     }()
     
     var context: NSManagedObjectContext {
-        return persistentContainer.viewContext
+        return container.viewContext
     }
     
-    // MARK: - Save Context
-    func saveContext() {
+    // MARK: - Save
+    func saveStuff() {
         if context.hasChanges {
             do {
                 try context.save()
+                print("Saved to CoreData!")
             } catch {
-                print("Error saving context: \(error)")
+                print("Couldn't save: \(error)")
             }
         }
     }
     
-    // MARK: - Favorite Operations
+    // MARK: - Favorite Stuff
     
-    /// Add a full recipe to favorites
-    func addFavorite(recipe: RecipeDetail) {
-        // Check if already exists
-        if isFavorite(recipeId: recipe.id) {
+    // adds a recipe to favorites
+    func addToFavs(recipe: RecipeDetail) {
+        // check if already there
+        if alreadyFav(recipeId: recipe.id) {
+            print("Already in favs!")
             return
         }
         
-        let favorite = FavoriteRecipe(context: context)
-        favorite.recipeId = Int64(recipe.id)
-        favorite.title = recipe.title
-        favorite.imageURL = recipe.image
-        favorite.readyInMinutes = Int32(recipe.readyInMinutes)
-        favorite.dateAdded = Date()
-        saveContext()
+        let fav = FavoriteRecipe(context: context)
+        fav.recipeId = Int64(recipe.id)
+        fav.title = recipe.title
+        fav.imageURL = recipe.image
+        fav.readyInMinutes = Int32(recipe.readyInMinutes)
+        fav.dateAdded = Date()
         
-        // Post notification
-        NotificationCenter.default.post(name: Self.favoritesChangedNotification, object: nil)
+        saveStuff()
+        
+        NotificationCenter.default.post(name: Self.favsChanged, object: nil)
     }
     
-    /// Remove a recipe from favorites
-    func removeFavorite(recipeId: Int) {
-        let fetchRequest: NSFetchRequest<FavoriteRecipe> = FavoriteRecipe.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "recipeId == %d", recipeId)
+    // removes from favorites
+    func removeFromFavs(recipeId: Int) {
+        let request: NSFetchRequest<FavoriteRecipe> = FavoriteRecipe.fetchRequest()
+        request.predicate = NSPredicate(format: "recipeId == %d", recipeId)
         
         do {
-            let results = try context.fetch(fetchRequest)
-            for favorite in results {
-                context.delete(favorite)
+            let list = try context.fetch(request)
+            for f in list {
+                context.delete(f)
             }
-            saveContext()
-            
-            // Post notification
-            NotificationCenter.default.post(name: Self.favoritesChangedNotification, object: nil)
+            saveStuff()
+            NotificationCenter.default.post(name: Self.favsChanged, object: nil)
         } catch {
-            print("Error removing favorite: \(error)")
+            print("Can't remove favorite: \(error)")
         }
     }
     
-    /// Check if a recipe is favorited
-    func isFavorite(recipeId: Int) -> Bool {
-        let fetchRequest: NSFetchRequest<FavoriteRecipe> = FavoriteRecipe.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "recipeId == %d", recipeId)
-        
+    // check if it's already a favorite
+    func alreadyFav(recipeId: Int) -> Bool {
+        let request: NSFetchRequest<FavoriteRecipe> = FavoriteRecipe.fetchRequest()
+        request.predicate = NSPredicate(format: "recipeId == %d", recipeId)
         do {
-            let count = try context.count(for: fetchRequest)
+            let count = try context.count(for: request)
             return count > 0
         } catch {
-            print("Error checking favorite: \(error)")
+            print("Error checking fav: \(error)")
             return false
         }
     }
     
-    /// Get all favorite recipe objects (sorted by date added, newest first)
-    func fetchAllFavorites() throws -> [FavoriteRecipe] {
-        let fetchRequest: NSFetchRequest<FavoriteRecipe> = FavoriteRecipe.fetchRequest()
-        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "dateAdded", ascending: false)]
-        
+    // get all favs
+    func getAllFavs() -> [FavoriteRecipe] {
+        let request: NSFetchRequest<FavoriteRecipe> = FavoriteRecipe.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(key: "dateAdded", ascending: false)]
         do {
-            let results = try context.fetch(fetchRequest)
-            return results
+            let list = try context.fetch(request)
+            print("Fetched \(list.count) favorites")
+            return list
         } catch {
-            print("Error fetching favorites: \(error)")
+            print("Can't fetch favorites: \(error)")
             return []
         }
     }
     
-    /// Clear all favorites
-    func clearAllFavorites() {
-        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = FavoriteRecipe.fetchRequest()
-        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
-        
+    // delete everything
+    func deleteAllFavs() {
+        let fetch: NSFetchRequest<NSFetchRequestResult> = FavoriteRecipe.fetchRequest()
+        let deleteReq = NSBatchDeleteRequest(fetchRequest: fetch)
         do {
-            try context.execute(deleteRequest)
-            saveContext()
-            
-            // Post notification
-            NotificationCenter.default.post(name: Self.favoritesChangedNotification, object: nil)
+            try context.execute(deleteReq)
+            saveStuff()
+            NotificationCenter.default.post(name: Self.favsChanged, object: nil)
         } catch {
-            print("Error clearing favorites: \(error)")
+            print("Can't delete all favs: \(error)")
         }
     }
 }

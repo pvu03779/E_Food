@@ -7,22 +7,28 @@ import Foundation
 
 @MainActor
 class CuisineViewModel: ObservableObject {
-    @Published var cuisineRecipes: [Recipe] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-
-    private let service = ApiService()
-
-    func fetchRecipes(for cuisine: String) async {
-        isLoading = true
-        errorMessage = nil
+    
+    @Published var recipes: [Recipe] = []
+    @Published var loading = false
+    @Published var errorText: String? = nil
+    
+    let api = ApiService()
+    
+    // tries to get recipes for a cuisine
+    func loadRecipes(cuisine: String) async {
+        loading = true
+        errorText = nil
+        print("load recipes for \(cuisine)...")
         
         do {
-            cuisineRecipes = try await service.fetchRecipes(query: nil, cuisine: cuisine)
+            let result = try await api.searchRecipes(cuisine: cuisine)
+            self.recipes = result
+            print("Get \(result.count) recipes")
         } catch {
-            errorMessage = "Failed to fetch recipes: \(error.localizedDescription)"
+            print("Error:", error)
+            self.errorText = "Could not load recipes"
         }
         
-        isLoading = false
+        loading = false
     }
 }

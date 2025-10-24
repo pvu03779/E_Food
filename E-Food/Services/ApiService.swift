@@ -5,114 +5,118 @@
 
 import Foundation
 
+// Just some basic errors I might need
 enum ApiError: Error {
-    case badURL
-    case requestFailed(Error)
-    case decodingFailed(Error)
+    case badUrl
+    case failedRequest
+    case badData
+    case decodeError
 }
 
 class ApiService {
-    private let apiKey = "api_key"
-    private let baseURL = "https://api.spoonacular.com"
     
-    private let jsonDecoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        return decoder
-    }()
+    let apiKey = "5e0356f3b7bd454886811a57765cecf9"
+    let baseURL = "https://api.spoonacular.com"
     
-    private func performRequest<T: Decodable>(
+    // Decoder thing for JSON
+    let decoder = JSONDecoder()
+    
+    // I made this function to try and reuse it for multiple requests
+    private func makeRequest<T: Decodable>(
         endpoint: String,
         queryItems: [URLQueryItem] = []
     ) async throws -> T {
         
-        // Build the URL
+        // make the url
         guard var components = URLComponents(string: baseURL + endpoint) else {
-            throw ApiError.badURL
+            throw ApiError.badUrl
         }
         
-        // Add all provided query items + the API key
-        var allQueryItems = queryItems
-        allQueryItems.append(URLQueryItem(name: "apiKey", value: apiKey))
-        components.queryItems = allQueryItems
+        var items = queryItems
+        items.append(URLQueryItem(name: "apiKey", value: apiKey))
+        components.queryItems = items
         
         guard let url = components.url else {
-            throw ApiError.badURL
+            throw ApiError.badUrl
         }
         
-        // Perform the network request
-        let data: Data
-        do {
-            (data, _) = try await URLSession.shared.data(from: url)
-        } catch {
-            throw ApiError.requestFailed(error)
-        }
+        // actually send it
+        let (data, _) = try await URLSession.shared.data(from: url)
         
-        // Decode the data
+        // decode json
         do {
-            let decodedResponse = try jsonDecoder.decode(T.self, from: data)
-            return decodedResponse
+            let result = try decoder.decode(T.self, from: data)
+            return result
         } catch {
-            throw ApiError.decodingFailed(error)
+            print("decode failed:", error)
+            throw ApiError.decodeError
         }
     }
     
-    func fetchRecipes(by ids: [Int]) async throws -> [RecipeDetail] {
-        guard !ids.isEmpty else { return [] }
+    // Trying to get multiple recipes by IDs
+    func getRecipesByIds(_ ids: [Int]) async throws -> [RecipeDetail] {
+        if ids.isEmpty {
+            return []
+        }
         
-        let idString = ids.map { String($0) }.joined(separator: ",")
-        let queryItems = [
-            URLQueryItem(name: "ids", value: idString)
+        let joinedIds = ids.map { "\($0)" }.joined(separator: ",")
+        let items = [
+            URLQueryItem(name: "ids", value: joinedIds)
         ]
-
-        // Just call the reusable function
-        return try await performRequest(
+        
+        let result: [RecipeDetail] = try await makeRequest(
             endpoint: "/recipes/informationBulk",
-            queryItems: queryItems
+            queryItems: items
         )
+        return result
     }
     
-    func fetchRecipes(query: String? = nil, cuisine: String? = nil) async throws -> [Recipe] {
-        var queryItems = [
-            URLQueryItem(name: "number", value: "15"),
+    // search recipes
+    func searchRecipes(name: String? = nil, cuisine: String? = nil) async throws -> [Recipe] {
+        var items = [
+            URLQueryItem(name: "number", value: "10"),
             URLQueryItem(name: "addRecipeInformation", value: "true")
         ]
         
-        if let query = query, !query.isEmpty {
-            queryItems.append(URLQueryItem(name: "query", value: query))
+        if let name = name, !name.isEmpty {
+            items.append(URLQueryItem(name: "query", value: name))
         } else if let cuisine = cuisine {
-            queryItems.append(URLQueryItem(name: "cuisine", value: cuisine))
+            items.append(URLQueryItem(name: "cuisine", value: cuisine))
         }
         
-        // The generic function decodes the wrapper, and we return the results
-        let decodedResponse: ApiResponse = try await performRequest(
+        let response: ApiResponse = try await makeRequest(
             endpoint: "/recipes/complexSearch",
-            queryItems: queryItems
+            queryItems: items
         )
-        return decodedResponse.results
+        
+        return response.results
     }
     
-    func fetchRecipeDetails(id: Int) async throws -> RecipeDetail {
-        let queryItems = [
+    // get one recipe
+    func getRecipeDetails(id: Int) async throws -> RecipeDetail {
+        let items = [
             URLQueryItem(name: "includeNutrition", value: "true")
         ]
         
-        return try await performRequest(
+        let recipe: RecipeDetail = try await makeRequest(
             endpoint: "/recipes/\(id)/information",
-            queryItems: queryItems
+            queryItems: items
         )
+        return recipe
     }
     
-    func fetchVideo(for query: String) async throws -> VideoInfo? {
-        let queryItems = [
+    // video fetching (not sure if this works)
+    func getVideo(query: String) async throws -> VideoInfo? {
+        let items = [
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "number", value: "1")
         ]
         
-        // The generic function decodes the wrapper, and we return the first video
-        let decodedResponse: VideoSearchResponse = try await performRequest(
+        let response: VideoSearchResponse = try await makeRequest(
             endpoint: "/food/videos/search",
-            queryItems: queryItems
+            queryItems: items
         )
-        return decodedResponse.videos.first
+        
+        return response.videos.first
     }
 }

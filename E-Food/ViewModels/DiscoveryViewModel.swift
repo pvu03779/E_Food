@@ -7,22 +7,28 @@ import Foundation
 
 @MainActor
 class DiscoveryViewModel: ObservableObject {
-    @Published var trendingRecipes: [Recipe] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-
-    private let service = ApiService()
-
-    func fetchTrendingRecipes() async {
-        isLoading = true
-        errorMessage = nil
+    
+    @Published var recipes: [Recipe] = []
+    @Published var loading = false
+    @Published var errorText: String? = nil
+    
+    let api = ApiService()
+    
+    // get some trending recipes
+    func getTrending() async {
+        loading = true
+        errorText = nil
+        print("Loading trending recipes...")
         
         do {
-            trendingRecipes = try await service.fetchRecipes()
+            let fetched = try await api.searchRecipes()
+            self.recipes = fetched
+            print("Got \(fetched.count) recipes!")
         } catch {
-            errorMessage = "Failed to fetch recipes: \(error.localizedDescription)"
+            print("Error:", error)
+            self.errorText = "Couldn’t get trending recipes"
         }
         
-        isLoading = false
+        loading = false
     }
 }

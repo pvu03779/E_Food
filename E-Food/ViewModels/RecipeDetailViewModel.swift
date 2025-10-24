@@ -7,49 +7,63 @@ import Foundation
 
 @MainActor
 class RecipeDetailViewModel: ObservableObject {
-    @Published var recipeDetail: RecipeDetail?
-    @Published var videoInfo: VideoInfo?
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var isFavorite: Bool = false
     
-    private let service = ApiService()
-    private let persistence = PersistenceManager.shared
+    @Published var recipe: RecipeDetail? = nil
+    @Published var video: VideoInfo? = nil
+    @Published var loading = false
+    @Published var errorText: String? = nil
+    @Published var fav = false
     
-    func fetchDetails(for recipeId: Int) async {
-        isLoading = true
-        errorMessage = nil
-        videoInfo = nil
+    let api = ApiService()
+    let db = PersistenceManager.shared
+    
+    func loadRecipe(recipeId: Int) async {
+        loading = true
+        errorText = nil
+        print("Loading recipe detail for id \(recipeId)")
         
-        if recipeDetail?.id == recipeId {
-            isLoading = false;
+        // just in case we already loaded this recipe
+        if recipe?.id == recipeId {
+            print("Already loaded, skipping fetch.")
+            loading = false
             return
         }
         
         do {
-            // 1. Fetch the main recipe details
-            let detail = try await service.fetchRecipeDetails(id: recipeId)
-            self.recipeDetail = detail
-            // 2. Use the recipe title to search for a related video
-            self.videoInfo = try await service.fetchVideo(for: detail.title)
-            self.isFavorite = persistence.isFavorite(recipeId: recipeId)
+            // get recipe info
+            let detail = try await api.getRecipeDetails(id: recipeId)
+            self.recipe = detail
+            print("Got recipe detail: \(detail.title)")
+            
+            // try get video
+            self.video = try await api.getVideo(query: detail.title)
+            print("Fetched video for \(detail.title)")
+            
+            // check favorite
+            self.fav = db.alreadyFav(recipeId: recipeId)
+            
         } catch {
-            errorMessage = "Failed to fetch recipe details or video: \(error.localizedDescription)"
+            print("Something went wrong: \(error)")
+            errorText = "Couldn't load recipe info"
         }
         
-        isLoading = false
+        loading = false
     }
     
-    func toggleFavorite() {
-        guard let detail = recipeDetail else { return }
-        
-        if isFavorite {
-            persistence.removeFavorite(recipeId: detail.id)
-        } else {
-            persistence.addFavorite(recipe: detail)
+    func toggleFav() {
+        guard let recipe = recipe else {
+            print("No recipe to favorite!")
+            return
         }
         
-        // Update the UI immediately
-        isFavorite.toggle()
+        if fav {
+            db.removeFromFavs(recipeId: recipe.id)
+            print("Removed from favorites")
+        } else {
+            db.addToFavs(recipe: recipe)
+            print("Added to favorites")
+        }
+        
+        fav.toggle()
     }
 }

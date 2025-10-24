@@ -1,70 +1,74 @@
 //
-//  RecipeCard.swift
+//  RecipeCardView.swift
 //  E-Food
 //
 
-import SwiftUICore
 import SwiftUI
 
 struct RecipeCardView: View {
     let recipe: Recipe
-
+    
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // AsyncImage loads the image from the URL
+            
+            // show image from URL (AsyncImage loads it)
             AsyncImage(url: URL(string: recipe.image)) { image in
-                image.resizable()
+                image
+                    .resizable()
+                    .scaledToFill()
             } placeholder: {
-                Rectangle().fill(Color.gray.opacity(0.3))
+                // if image not loaded yet
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
             }
-            .aspectRatio(contentMode: .fill)
             .frame(width: 200, height: 250)
             .cornerRadius(15)
-
-            // Fading overlay for text visibility
-            VStack {
-                Spacer()
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: 120)
-            }
-            .cornerRadius(15)
+            .clipped()
             
-            // Rating overlay
-            HStack {
-                Image(systemName: "star.fill")
-                    .foregroundColor(.yellow)
-                Text(String(format: "%.1f", (Double(recipe.healthScore ?? 80) / 20.0)))
-                    .foregroundColor(.white)
-                    .fontWeight(.semibold)
+            // make bottom darker so text can be seen
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.7)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+            .cornerRadius(15)
+            .frame(height: 120)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            
+            // add rating (just a star + number)
+            VStack {
+                HStack {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                    Text(String(format: "%.1f", (Double(recipe.healthScore ?? 80) / 20.0)))
+                        .foregroundColor(.white)
+                        .font(.subheadline)
+                }
+                .padding(6)
+                .background(Color.black.opacity(0.5))
+                .cornerRadius(8)
+                .frame(maxWidth: .infinity, alignment: .topTrailing)
+                .padding(10)
+                
+                Spacer()
             }
-            .padding(8)
-            .background(Color.black.opacity(0.5))
-            .cornerRadius(10)
-            .padding([.top, .trailing], 10)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
-
-            // Recipe details text
+            
+            // bottom text info
             VStack(alignment: .leading) {
                 Text(recipe.title)
                     .font(.headline)
                     .foregroundColor(.white)
                     .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text("\(recipe.readyInMinutes ?? 45) Min | \(recipe.difficulty)")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.bottom, 2)
+                
+                Text("\(recipe.readyInMinutes ?? 45) mins | \(recipe.difficulty)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.9))
             }
             .padding()
         }
         .frame(width: 200, height: 250)
+        .cornerRadius(15)
+        .shadow(radius: 3)
     }
 }

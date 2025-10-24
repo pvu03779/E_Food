@@ -3,31 +3,38 @@
 //  E-Food
 //
 
-import SwiftUICore
 import SwiftUI
 
 struct CuisineRecipesView: View {
-    let cuisine: String
-    @StateObject private var viewModel = CuisineViewModel()
+    
+    var cuisine: String
+    @StateObject var viewModel = CuisineViewModel()
     
     var body: some View {
-        Group {
-            if viewModel.isLoading {
-                ProgressView()
-            } else if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage).foregroundColor(.red).padding()
+        VStack {
+            if viewModel.loading {
+                ProgressView("Loading...")
+            } else if let msg = viewModel.errorText {
+                Text(msg)
+                    .foregroundColor(.red)
+                    .padding()
             } else {
-                List(viewModel.cuisineRecipes) { recipe in
-                    NavigationLink(destination: RecipeDetailView(recipeId: recipe.id)) {
+                List(viewModel.recipes, id: \.id) { recipe in
+                    NavigationLink {
+                        RecipeDetailView(recipeId: recipe.id)
+                    } label: {
                         RecipeRowView(recipe: recipe)
                     }
                 }
-                .listStyle(PlainListStyle())
+                .listStyle(.plain)
             }
         }
-        .navigationTitle(cuisine)
-        .task {
-            await viewModel.fetchRecipes(for: cuisine)
+        .navigationTitle("\(cuisine) Recipes")
+        .onAppear {
+            print("Fetching recipes for \(cuisine)")
+            Task {
+                await viewModel.loadRecipes(cuisine: cuisine)
+            }
         }
     }
 }
