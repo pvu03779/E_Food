@@ -15,7 +15,7 @@ enum ApiError: Error {
 
 class ApiService {
     
-    let apiKey = "5e0356f3b7bd454886811a57765cecf9"
+    let apiKey = "a940a2d9e509415f95ee3998d8b5eb54"
     let baseURL = "https://api.spoonacular.com"
     
     // Decoder thing for JSON
