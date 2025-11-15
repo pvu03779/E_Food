@@ -6,11 +6,15 @@
 import Foundation
 import UserNotifications
 
-class NotificationManager {
+class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationManager()
     
-    private init() {}
-
+    private override init() {
+        super.init()
+        // Set the delegate to handle foreground notifications
+        UNUserNotificationCenter.current().delegate = self
+    }
+    
     // Request permission from the user to send notifications
     func requestAuthorization() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
@@ -21,17 +25,26 @@ class NotificationManager {
             }
         }
     }
-
+    
     // Schedule a notification to fire after a specific time interval
     func scheduleNotification(title: String, body: String, timeInterval: TimeInterval) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = UNNotificationSound.default
-
+        
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: false)
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
-
+        
         UNUserNotificationCenter.current().add(request)
+    }
+    
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show the alert, play the sound, and update the badge
+        completionHandler([.alert, .sound, .badge])
     }
 }

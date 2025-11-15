@@ -14,10 +14,8 @@ struct CookingModeView: View {
                 
                 // Timer Circle
                 ZStack {
-                    // gray circle background
                     Circle()
                         .stroke(Color.gray.opacity(0.2), lineWidth: 15)
-                    
                     // progress bar
                     Circle()
                         .trim(from: 0, to: CGFloat(viewModel.timeLeft / viewModel.currentDuration))
